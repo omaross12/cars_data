@@ -1,0 +1,653 @@
+---
+title: "Untitled"
+author: "Omar Ossama"
+date: "7/19/2020"
+output: html_document
+---
+
+##Setting working directory
+```{r setup, include=FALSE}
+setwd ("C:/Users/omaro/Documents/DSBA/04-Predictive Modeling/Project")
+```
+
+##Used libraries
+```{r}
+library(readxl)          #Import file
+library(mice)            #Calculate missing data
+library(esquisse)        #Plotting tool
+library(corrplot)        #Plot corelation between numerical varaibles
+library(ggplot2)         #Visulization
+library(gridExtra)       #Creating Histogram & Boxplot function
+library(caTools)         #Splitting the dataset
+library(caret)           #Building confusion matrix and comparing models
+library(xgboost)         #XGB model
+library(DMwR)            #sMOTE
+library(caretEnsemble)   #Creating ensemble model
+```
+
+##Importing data
+```{r}
+cars = read.csv("Cars-dataset.csv")
+```
+
+##Data overview
+```{r}
+head(cars)
+tail(cars)
+dim(cars)
+colnames(cars)
+str(cars)
+summary(cars)
+```
+
+##Checking and treatment for NA values
+```{r}
+sum(is.na(cars))
+md.pattern(cars)
+init.impute = mice(cars, m=2, method = "pmm", seed = 1000)
+cars = complete(init.impute, 2)
+```
+
+##Converting variable types
+```{r}
+cars$Gender = as.factor(cars$Gender)
+cars$Engineer = as.factor(cars$Engineer)
+cars$MBA = as.factor(cars$MBA)
+cars$license = as.factor(cars$license)
+cars$Transport = as.factor(cars$Transport)
+dim(cars)
+str(cars)
+summary(cars)
+```
+
+##Depandant variable balance
+```{r}
+prop.table(table(cars$Transport))
+```
+
+##Function to display histogram and boxplot
+```{r}
+plot_histogram_n_boxplot = function(variable, variableNameString, binw){
+  h = ggplot(data = cars, aes(x= variable))+
+    labs(x = variableNameString,y ='Count')+
+    geom_histogram(fill = 'green',col = 'white',binwidth = binw)+
+    geom_vline(aes(xintercept=mean(variable)),
+            color="black", linetype="dashed", size=0.5)
+  b = ggplot(data = cars, aes('',variable))+ 
+    geom_boxplot(outlier.colour = 'red',col = 'red',outlier.shape = 19)+
+    labs(x = '',y = variableNameString)+ coord_flip()
+  grid.arrange(h,b,ncol = 2)
+}
+```
+
+##Univariate analysis for numerical variables
+```{r}
+plot_histogram_n_boxplot(cars$Age, 'Age', 1)
+
+plot_histogram_n_boxplot(cars$Work.Exp, 'Work experience', 1)
+
+plot_histogram_n_boxplot(cars$Salary, 'Salary', 1)
+
+plot_histogram_n_boxplot(cars$Distance, 'Distance from work', 1)
+
+```
+
+##Univariate analysis for the catagorical variables
+```{r}
+
+ggplot(cars) +
+ aes(x = Gender) +
+ geom_bar(fill = "green") +
+ labs(y = "Count") +
+ theme_gray()
+
+ggplot(cars) +
+ aes(x = Engineer) +
+ geom_bar(fill = "green") +
+ labs(y = "Count") +
+ theme_gray()
+
+ggplot(cars) +
+ aes(x = MBA) +
+ geom_bar(fill = "green") +
+ labs(y = "Count") +
+ theme_gray()
+
+ggplot(cars) +
+ aes(x = license) +
+ geom_bar(fill = "green") +
+ labs(y = "Count") +
+  labs(x="License") +
+ theme_gray()
+
+ggplot(cars) +
+ aes(x = Transport) +
+ geom_bar(fill = "green") +
+ labs(y = "Count") +
+ theme_gray()
+
+```
+
+##Correlations between method of transport and the other variables
+```{r}
+
+ggplot(cars, aes(fill = Transport, x = Age)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Transport, x = Work.Exp)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Transport, x = Salary)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Transport, x = Distance)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Transport, cars$Gender)
+ggplot(cars, aes(fill = Transport, x = Gender)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Transport, cars$Engineer)
+ggplot(cars, aes(fill = Transport, x = Engineer)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Transport, cars$MBA)
+ggplot(cars, aes(fill = Transport, x = MBA)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Transport, cars$license)
+ggplot(cars, aes(fill = Transport, x = license)) + 
+    geom_bar(position="fill")
+
+```
+
+##Multivariate analysis
+```{r}
+corrplot(cor(cars[c(1,5:7)]),type="lower",method="number")
+```
+
+##Performing bivariate analysis between random variables
+```{r}
+
+ggplot(cars, aes(fill = Gender, x = Salary)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = license, x = Age)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = MBA, x = Salary)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = MBA, x = Age)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Gender, cars$Engineer)
+ggplot(cars, aes(fill = Engineer, x = Gender)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = license, x = Distance)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Engineer, x = Age)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = MBA, x = Age)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Gender, x = Work.Exp)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Gender, x = Distance)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Gender, cars$license)
+ggplot(cars, aes(fill = Gender, x = license)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Gender, cars$MBA)
+ggplot(cars, aes(fill = Gender, x = MBA)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Engineer, cars$MBA)
+ggplot(cars, aes(fill = Engineer, x = MBA)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Engineer, x = Work.Exp)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Engineer, x = Salary)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = Engineer, x = Distance)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$Engineer, cars$license)
+ggplot(cars, aes(fill = Engineer, x = license)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = MBA, x = Work.Exp)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = MBA, x = Distance)) + 
+    geom_bar(position="fill")
+
+chisq.test(cars$MBA, cars$license)
+ggplot(cars, aes(fill = MBA, x = license)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = license, x = Work.Exp)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = license, x = Salary)) + 
+    geom_bar(position="fill")
+
+ggplot(cars, aes(fill = license, x = Distance)) + 
+    geom_bar(position="fill")
+
+```
+
+##Re-importing data
+```{r}
+cars = read.csv("Cars-dataset.csv")
+
+init.impute = mice(cars, m=2, method = "pmm", seed = 1000)
+cars = complete(init.impute, 2)
+```
+
+
+##Outlier treatment
+```{r}
+quantile(cars$Age, probs = seq(0,1,0.05))
+cars$Age[which(cars$Age < 22)] <- 22
+cars$Age[which(cars$Age > 32.3)] <- 32.3
+
+quantile(cars$Work.Exp, probs = seq(0,1,0.05))
+cars$Work.Exp[which(cars$Work.Exp > 12)] <- 12
+
+quantile(cars$Salary, probs = seq(0,1,0.05))
+cars$Salary[which(cars$Salary > 20.700)] <- 20.700
+
+quantile(cars$Distance, probs = seq(0,1,0.05))
+cars$Distance[which(cars$Distance > 17.915)] <- 17.915
+
+```
+
+##Converting Gender variable to numerical value
+```{r}
+cars$Gender[cars$Gender=="Male"] <- "1"
+cars$Gender[cars$Gender=="Female"] <- "0"
+```
+
+##Adding variable with 2 outcomes for the employees who use cars and those who do not
+```{r}
+cars$isCar = ifelse (cars$Transport == "Car", cars$isCar <- "Yes", cars$isCar <- "No")
+
+cars = cars [,-9]
+
+cars$Gender = as.numeric(cars$Gender)
+cars$isCar = as.factor(cars$isCar)
+
+summary(cars)
+
+prop.table(table(cars$isCar))
+```
+
+##Splitting data to train and test sets
+```{r}
+set.seed(1000)
+
+sample = sample.split(cars$isCar,SplitRatio = 0.7)
+train = subset(cars,sample == TRUE)
+test = subset(cars,sample == FALSE)
+
+dim(train)
+dim(test)
+
+prop.table(table(train$isCar))
+prop.table(table(test$isCar))
+```
+
+##Training model parameters
+```{r}
+fitControl <- trainControl(
+              method = 'repeatedcv',
+              number = 4,
+              repeats = 1,
+              allowParallel = TRUE,
+              classProbs = TRUE,
+              summaryFunction=twoClassSummary
+              ) 
+```
+
+##Building logistic regression model using variables that have no correlation
+```{r}
+lr_model <- train(isCar ~ Age+Distance, data = train,
+                 method = "glm",
+                 family = "binomial",
+                 trControl = fitControl)
+
+summary(lr_model)
+```
+
+##Logistic model performance
+```{r}
+lr_train_pred <- predict(lr_model, newdata = train, type = "raw")
+
+confusionMatrix(lr_train_pred, train$isCar)
+
+lr_test_pred <- predict(lr_model, newdata = test, type = "raw")
+
+confusionMatrix(lr_test_pred, test$isCar)
+```
+#Train
+Accuracy: 98.63%
+Sensitivity: 99.25%
+Specificity: 91.67%
+#Test
+Accuracy: 97.62%
+Sensitivity: 97.39%
+Specificity: 100%
+
+##Naive Bayes model
+```{r}
+nb_model <- train(isCar ~ ., data = train,
+                 method = "naive_bayes",
+                 trControl = fitControl)
+```
+
+##Naiive Bayes model performance
+```{r}
+nb_train_pred <- predict(nb_model, newdata = train, type = "raw")
+
+confusionMatrix(nb_train_pred, train$isCar)
+
+nb_test_pred <- predict(nb_model, newdata = test, type = "raw")
+
+confusionMatrix(nb_test_pred, test$isCar)
+```
+#Train
+Accuracy: 99.32%
+Sensitivity: 99.63%
+Specificity: 95.83%
+#Test
+Accuracy: 95.24%
+Sensitivity: 94.78%
+Specificity: 100%
+
+##KNN model
+```{r}
+knn_model <- train(isCar ~ ., data = train,
+                   preProcess = c("center", "scale"),
+                   method = "knn",
+                   tuneLength = 3,
+                   trControl = fitControl)
+```
+
+##KNN model performance
+```{r}
+knn_train_pred <- predict(knn_model, newdata = train, type = "raw")
+
+confusionMatrix(knn_train_pred, train$isCar)
+
+knn_test_pred <- predict(knn_model, newdata = test, type = "raw")
+
+confusionMatrix(knn_test_pred, test$isCar)
+```
+#Train
+Accuracy: 97.95%
+Sensitivity: 98.88%
+Specificity: 87.50%
+#Test
+Accuracy: 96.03%
+Sensitivity: 98.26%
+Specificity: 72.73%
+
+#Random Forest (Bagging)
+```{r}
+rf_model <- train(isCar ~ ., data = train,
+                     method = "rf",
+                     ntree = 30,
+                     maxdepth = 5,
+                     tuneLength = 10,
+                     trControl = fitControl)
+```
+
+##Random Forrest model performance
+```{r}
+rf_train_pred <- predict(rf_model, newdata = train, type = "raw")
+
+confusionMatrix(rf_train_pred, train$isCar)
+
+rf_test_pred <- predict(rf_model, newdata = test, type = "raw")
+
+confusionMatrix(rf_test_pred, test$isCar)
+```
+#Train
+Accuracy: 100%
+Sensitivity: 100%
+Specificity: 100%
+#Test
+Accuracy: 97.62%
+Sensitivity: 97.39%
+Specificity: 100%
+
+##Extreme Gradient Boosting model
+```{r}
+cv_ctrl <- trainControl(method = "repeatedcv", repeats = 1,number = 3, 
+                        summaryFunction = twoClassSummary,
+                        classProbs = TRUE,
+                        allowParallel=T)
+
+    xgb_grid <- expand.grid(nrounds = 100,
+                            eta = c(0.01),
+                            max_depth = 4,
+                            gamma = 0,
+                            colsample_bytree = 1,    
+                            min_child_weight = 1,    
+                            subsample = 1            
+    )
+
+    xgb_model <-train(isCar~.,
+                     data=train,
+                     method="xgbTree",
+                     trControl=cv_ctrl,
+                     tuneGrid=xgb_grid,
+                     verbose=T,
+                     nthread = 2
+    )
+    
+xgb_model
+```
+
+##XGB model performance
+```{r}
+xgb_train_pred <- predict(xgb_model, newdata = train, type = "raw")
+
+confusionMatrix(xgb_train_pred, train$isCar)
+
+xgb_test_pred <- predict(xgb_model, newdata = test, type = "raw")
+
+confusionMatrix(xgb_test_pred, test$isCar)
+```
+#Train
+Accuracy: 100%
+Sensitivity: 100%
+Specificity: 100%
+#Test
+Accuracy: 98.41%
+Sensitivity: 98.26%
+Specificity: 100%
+
+##SMOTE
+```{r}
+table(train$isCar)
+prop.table(table(train$isCar))
+
+smote_train <- SMOTE(isCar ~ ., data  = train,
+                     perc.over = 3500,
+                     perc.under = 200,
+                     k = 5)   
+
+table(smote_train$isCar)
+prop.table(table(smote_train$isCar))
+```
+
+#Random Forest using SMOTE data
+```{r}
+rf_model2 <- train(isCar ~ ., data = smote_train,
+                     method = "rf",
+                     ntree = 30,
+                     maxdepth = 5,
+                     tuneLength = 10,
+                     trControl = fitControl)
+```
+
+##Random Forrest SmMOTE model performance
+```{r}
+rf_train_pred2 <- predict(rf_model2, newdata = smote_train, type = "raw")
+
+confusionMatrix(rf_train_pred2, smote_train$isCar)
+
+rf_test_pred2 <- predict(rf_model2, newdata = test, type = "raw")
+
+confusionMatrix(rf_test_pred2, test$isCar)
+```
+#Train
+Accuracy: 100%
+Sensitivity: 100%
+Specificity: 100%
+#Test
+Accuracy: 100%
+Sensitivity:100%
+Specificity: 100%
+
+##XGB with SMOTE data
+```{r}
+cv.ctrl2 <- trainControl(method = "repeatedcv", repeats = 1,number = 3, 
+                        summaryFunction = twoClassSummary,
+                        classProbs = TRUE,
+                        allowParallel=T,
+                        sampling= 'up')
+
+    xgb.grid2 <- expand.grid(nrounds = 500,
+                            eta = c(0.01),
+                            max_depth = 4,
+                            gamma = 0,               
+                            colsample_bytree = 1,    
+                            min_child_weight = 1, 
+                            subsample = 1          
+    )
+
+    xgb_model2 <-train(isCar~.,
+                     data=smote_train,
+                     method="xgbTree",
+                     trControl=cv.ctrl2,
+                     tuneGrid=xgb.grid2,
+                     verbose=T,
+                     nthread = 2
+    )
+    
+xgb_model2
+```
+
+##XGB model performance
+```{r}
+xgb_train_pred2 <- predict(xgb_model2, newdata = smote_train, type = "raw")
+
+confusionMatrix(xgb_train_pred2, smote_train$isCar)
+
+xgb_test_pred2 <- predict(xgb_model2, newdata = test, type = "raw")
+
+confusionMatrix(xgb_test_pred2, test$isCar)
+```
+#Train
+Accuracy: 100%
+Sensitivity: 100%
+Specificity: 100%
+#Test
+Accuracy: 100%
+Sensitivity: 100%
+Specificity: 100%
+
+##Building logistic regression model after SMOTE
+```{r}
+lr_model2 <- train(isCar ~ Age+Distance, data = smote_train,
+                 method = "glm",
+                 family = "binomial",
+                 trControl = fitControl)
+
+summary(lr_model2)
+```
+
+##Logistic model performance
+```{r}
+lr_train_pred2 <- predict(lr_model2, newdata = smote_train, type = "raw")
+
+confusionMatrix(lr_train_pred2, smote_train$isCar)
+
+lr_test_pred2 <- predict(lr_model2, newdata = test, type = "raw")
+
+confusionMatrix(lr_test_pred2, test$isCar)
+```
+#Train
+Accuracy: 99.37%
+Sensitivity: 99.23%
+Specificity: 99.65%
+#Test
+Accuracy: 96.83%
+Sensitivity: 96.52%
+Specificity: 100%
+
+##Naive Bayes model after SMOTE
+```{r}
+nb_model2 <- train(isCar ~ ., data = smote_train,
+                 method = "naive_bayes",
+                 trControl = fitControl)
+```
+
+##Naiive Bayes model performance
+```{r}
+nb_train_pred2 <- predict(nb_model2, newdata = smote_train, type = "raw")
+
+confusionMatrix(nb_train_pred2, smote_train$isCar)
+
+nb_test_pred2 <- predict(nb_model2, newdata = test, type = "raw")
+
+confusionMatrix(nb_test_pred2, test$isCar)
+```
+#Train
+Accuracy: 98.11%
+Sensitivity: 99.76%
+Specificity: 94.91%
+#Test
+Accuracy: 96.83%
+Sensitivity: 96.52%
+Specificity: 100%
+
+##KNN model after SMOTE
+```{r}
+knn_model2 <- train(isCar ~ ., data = smote_train,
+                   preProcess = c("center", "scale"),
+                   method = "knn",
+                   tuneLength = 3,
+                   trControl = fitControl)
+```
+
+##KNN model performance
+```{r}
+knn_train_pred2 <- predict(knn_model2, newdata = smote_train, type = "raw")
+
+confusionMatrix(knn_train_pred2, smote_train$isCar)
+
+knn_test_pred2 <- predict(knn_model2, newdata = test, type = "raw")
+
+confusionMatrix(knn_test_pred2, test$isCar)
+```
+#Train
+Accuracy: 99.84%
+Sensitivity: 99.76%
+Specificity: 100%
+#Test
+Accuracy: 96.03%
+Sensitivity: 97.39%
+Specificity: 81.82%
